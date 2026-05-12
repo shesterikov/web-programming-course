@@ -283,5 +283,6 @@ kubectl delete -f k8s/06-api/ -f k8s/05-rabbitmq/ ... -f k8s/00-namespace.yaml
 ### Рекомендуемая литература и документация
 - [Kubernetes Concepts](https://kubernetes.io/docs/concepts/)
 - [Configure Liveness, Readiness and Startup Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+- [How to do distributed locking / Martin Kleppmann](https://martin.kleppmann.com/2016/02/08/how-to-do-distributed-locking.html)
 - [Distributed Locks with Redis](https://redis.io/docs/latest/develop/clients/patterns/distributed-locks/)
 - [Docker CLI Reference](https://docs.docker.com/reference/cli/)
