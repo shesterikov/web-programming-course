@@ -1,7 +1,7 @@
 # Знакомство с масштабированием веб-приложений на примере Kubernetes
 
 ### Цель работы
-Познакомиться с процессом горизонтального масштабирования веб-приложений на примере Kubernetes, изучить понятия liveness / readiness probes, познакомиться с распределёнными блокировками.
+Познакомиться с процессом горизонтального масштабирования веб-приложений на примере Kubernetes, изучить понятия liveness / readiness probes, познакомиться с распределёнными блокировками. Развернуть в одном кластере API и клиентское приложение из работы [Разработка клиентского приложения (SPA)](../spa-client) так, чтобы браузер обращался к ним через один источник.
 
 ### Технические требования
 - Наличие интернет-соединения.
@@ -9,6 +9,7 @@
 - Наличие [Docker](https://docs.docker.com/desktop/) и [Docker Compose](https://docs.docker.com/compose/install/).
 - Наличие [Kubernetes](https://docs.docker.com/desktop/features/kubernetes/) (в составе Docker Desktop)
 - Наличие [k9s](https://k9scli.io/topics/install/) (опционально, для визуализации)
+- Рабочая версия серверного приложения и клиента из работы [Разработка клиентского приложения (SPA)](../spa-client)
 
 ### Краткие теоретические сведения
 
@@ -179,6 +180,7 @@ readinessProbe:
                 -f k8s/05-rabbitmq/ \
                 -f k8s/06-api/
    ```
+   Манифесты клиента из `k8s/07-web/` применяются на шаге 12, после проверки API.
 
 7. Проверьте корректность запуска:
    ```bash
@@ -205,7 +207,7 @@ readinessProbe:
    kubectl scale deployment/api --replicas=4 -n wp-labs
    ```
 
-11. Создайте нового пользователя через `POST /users`.  
+11. Создайте нового пользователя через `POST /auth/register`.  
     В логах подов (`kubectl logs -f <pod-name> -n wp-labs`) убедитесь, что событие обрабатывается только на одном поде.  
     Если обработка дублируется: реализуйте распределённую блокировку в Redis перед критической секцией кода. Пример псевдокода:
     ```typescript
@@ -221,6 +223,22 @@ readinessProbe:
     }
     ```
 
+12. Разверните клиентское приложение из работы [Разработка клиентского приложения (SPA)](../spa-client). В кластере клиент и API будут доступны браузеру через один источник: веб-сервер клиента раздаёт статику и проксирует запросы с префикса `/api` на сервис `api`. Поэтому клиент собирается с относительным адресом API, а не с `http://localhost:4200`:
+    ```bash
+    docker build -t wp-labs/web:1.0.0 --build-arg VITE_API_URL=/api ./client
+    ```
+    Изучите манифесты в `k8s/07-web/`: конфигурация nginx лежит в `ConfigMap` и монтируется в контейнер, директива `proxy_pass` с завершающим `/` отбрасывает префикс `/api` перед передачей запроса в API, а `try_files` возвращает `index.html` для клиентских маршрутов. Примените манифесты и пробросьте порт:
+    ```bash
+    kubectl apply -f k8s/07-web/
+    kubectl port-forward svc/web 8080:80 -n wp-labs
+    ```
+    Откройте `http://localhost:8080`, войдите в систему и убедитесь, что приложение работает целиком: список ресурсов, профиль с аватаром, выход.
+
+13. Откройте вкладку Network инструментов разработчика и сравните с локальным запуском через `docker-compose` из работы [Разработка клиентского приложения (SPA)](../spa-client): запросы `OPTIONS` не отправляются, заголовки `Access-Control-*` в ответах отсутствуют, атрибут `SameSite` не влияет на передачу cookies. Будьте готовы объяснить, почему так происходит. Затем выполните масштабирование клиента и убедитесь, что приложение продолжает работать:
+    ```bash
+    kubectl scale deployment/web --replicas=3 -n wp-labs
+    ```
+
 ### Критерии приемки
 Репозиторий: 
 - Код загружен на GitHub, присутствует `.gitignore`.
@@ -231,12 +249,15 @@ readinessProbe:
 
 Функциональность:
 - Весь функционал, реализованный в предыдущих лабораторных работах, отрабатывает корректно
+- Клиент развёрнут в кластере (`Deployment` и `Service` в `k8s/07-web/`), доступен через проброс порта и обращается к API через один источник без CORS
+- Прямое открытие клиентского маршрута и перезагрузка страницы не приводят к ошибке `404`
 
 ### Справочник CLI-команд
 
 ```bash
 # === Сборка и деплой ===
-docker build -t wp-labs/api:1.0.0 .
+docker build -t wp-labs/api:1.0.0 ./api
+docker build -t wp-labs/web:1.0.0 --build-arg VITE_API_URL=/api ./client
 
 kubectl apply -f k8s/00-namespace.yaml
 kubectl apply -f k8s/01-postgresql/
@@ -245,6 +266,7 @@ kubectl apply -f k8s/03-redis/
 kubectl apply -f k8s/04-minio/
 kubectl apply -f k8s/05-rabbitmq/
 kubectl apply -f k8s/06-api/
+kubectl apply -f k8s/07-web/
 
 # === Мониторинг ===
 kubectl get all -n wp-labs
@@ -255,16 +277,18 @@ kubectl describe pod <pod-name> -n wp-labs
 
 # === Масштабирование ===
 kubectl scale deployment/api --replicas=4 -n wp-labs
+kubectl scale deployment/web --replicas=3 -n wp-labs
 kubectl autoscale deployment/api --min=2 --max=6 --cpu-percent=70 -n wp-labs
 
 # === Отладка ===
 kubectl port-forward svc/api 4200:4200 -n wp-labs
+kubectl port-forward svc/web 8080:80 -n wp-labs
 kubectl exec -it <pod-name> -n wp-labs -- /bin/sh
 
 # === Очистка ===
 kubectl delete namespace wp-labs
 # или покомпонентно:
-kubectl delete -f k8s/06-api/ -f k8s/05-rabbitmq/ ... -f k8s/00-namespace.yaml
+kubectl delete -f k8s/07-web/ -f k8s/06-api/ -f k8s/05-rabbitmq/ ... -f k8s/00-namespace.yaml
 ```
 
 ### Контрольные вопросы
@@ -278,6 +302,8 @@ kubectl delete -f k8s/06-api/ -f k8s/05-rabbitmq/ ... -f k8s/00-namespace.yaml
 8. Что такое `Namespace` и зачем он нужен в многопользовательском кластере?
 9. Почему масштабирование stateful-сервисов через репликацию подов не гарантирует консистентность данных?
 10. Какие условия должны выполняться для корректной работы распределённой блокировки в Redis?
+11. Почему при проксировании запросов к API через веб-сервер клиента механизм CORS перестаёт задействоваться? Что при этом происходит с атрибутом `SameSite` у cookies?
+12. Почему адрес API для клиента задаётся на этапе сборки образа, а не через переменную окружения контейнера? Как это влияет на переиспользование образа между окружениями?
 
 ### Рекомендуемая литература и документация
 - [Kubernetes Concepts](https://kubernetes.io/docs/concepts/)
