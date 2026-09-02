@@ -1,0 +1,40 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: web-nginx-config
+  namespace: wp-labs
+  labels:
+    app: web
+    managed-by: kubernetes
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+
+      root /usr/share/nginx/html;
+      index index.html;
+
+      # Запросы к API уходят на сервис api внутри кластера.
+      # Завершающий "/" в proxy_pass отбрасывает префикс /api:
+      # GET /api/items -> GET http://api:4200/items
+      location /api/ {
+        proxy_pass http://api.wp-labs.svc.cluster.local:4200/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 10m;
+      }
+
+      # Клиентские маршруты SPA: любой неизвестный путь отдаёт index.html
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+
+      location = /healthz {
+        access_log off;
+        return 200 "ok";
+      }
+    }

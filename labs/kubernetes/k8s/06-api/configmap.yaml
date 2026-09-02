@@ -17,6 +17,12 @@ data:
 
   CALLBACK_URL: "http://localhost:4200/auth/yandex/callback"
 
+  # Адрес клиента при доступе через kubectl port-forward svc/web 8080:80.
+  # В кластере клиент и API за одним источником, CORS не задействуется,
+  # но переменные обязаны быть заданы: их читает код из работы по авторизации.
+  CORS_ORIGIN: "http://localhost:8080"
+  FRONTEND_URL: "http://localhost:8080"
+
   MINIO_ENDPOINT: "minio.wp-labs.svc.cluster.local:9000"
   MINIO_BUCKET: "wp-labs-files"
   MINIO_USE_SSL: "false"
