@@ -57,7 +57,7 @@ JWT_REFRESH_EXPIRATION=7d
 
 CLIENT_ID=your_client_id
 CLIENT_SECRET=your_client_secret
-CALLBACK_URL=http://localhost:4200/auth/yandex/callback
+CALLBACK_URL=http://localhost:4200/auth/oauth/yandex/callback
 
 CORS_ORIGIN=http://localhost:5173
 FRONTEND_URL=http://localhost:5173
