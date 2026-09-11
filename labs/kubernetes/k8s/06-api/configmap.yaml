@@ -15,7 +15,17 @@ data:
   JWT_ACCESS_EXPIRATION: "15m"
   JWT_REFRESH_EXPIRATION: "7d"
 
-  CALLBACK_URL: "http://localhost:4200/auth/yandex/callback"
+  # Единственная точка входа в кластер — веб-сервер клиента на :8080,
+  # он проксирует /api на этот сервис. Провайдер должен возвращать
+  # пользователя туда же, поэтому адрес идёт через префикс /api.
+  # Этот же URL необходимо зарегистрировать в консоли разработчика провайдера.
+  CALLBACK_URL: "http://localhost:8080/api/auth/oauth/yandex/callback"
+
+  # Адрес клиента при доступе через kubectl port-forward svc/web 8080:80.
+  # В кластере клиент и API за одним источником, CORS не задействуется,
+  # но переменные обязаны быть заданы: их читает код из работы по авторизации.
+  CORS_ORIGIN: "http://localhost:8080"
+  FRONTEND_URL: "http://localhost:8080"
 
   MINIO_ENDPOINT: "minio.wp-labs.svc.cluster.local:9000"
   MINIO_BUCKET: "wp-labs-files"
